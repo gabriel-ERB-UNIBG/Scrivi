@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Scrivi">
+<meta name="theme-color" content="#111210">
+<title>Scrivi nell'aria</title>
+<style>
+:root{--acc:#ff5b14;--ink:#f4f2ec;--glass:rgba(17,18,16,.62)}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:#111210;color:var(--ink);font:16px/1.45 -apple-system,system-ui,"Segoe UI",Roboto,sans-serif;overflow:hidden;overscroll-behavior:none}
+#cv{position:fixed;inset:0;width:100%;height:100%;object-fit:cover;background:#111210;touch-action:none}
+video{display:none}
+#top{position:fixed;top:calc(env(safe-area-inset-top) + 10px);left:12px;right:12px;display:flex;justify-content:space-between;align-items:center;gap:8px;pointer-events:none}#top .b{pointer-events:auto}
+.chip{background:var(--glass);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);padding:7px 12px;border-radius:99px;font-size:14px;font-weight:600;display:flex;align-items:center;gap:8px}
+.chip i{width:10px;height:10px;border-radius:50%;background:#888;display:inline-block}
+.chip.on i{background:var(--acc);box-shadow:0 0 10px var(--acc)}
+#rec{display:none}#rec.show{display:flex}#rec i{background:#ff2d2d;animation:bl 1s infinite}
+@keyframes bl{50%{opacity:.2}}
+#bar{position:fixed;left:0;right:0;bottom:0;padding:12px 12px calc(env(safe-area-inset-bottom) + 12px);background:linear-gradient(to top,rgba(10,10,9,.85),rgba(10,10,9,0));display:grid;gap:12px}
+.row{display:flex;gap:6px;justify-content:center;flex-wrap:wrap}
+.dot{width:34px;height:34px;border-radius:50%;border:2px solid rgba(255,255,255,.35);padding:0}
+.dot.sel{outline:3px solid var(--acc);outline-offset:2px}
+.b{min-width:44px;height:46px;padding:0 10px;border-radius:14px;border:0;background:var(--glass);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);color:var(--ink);font:600 14px -apple-system,system-ui,sans-serif;display:flex;align-items:center;justify-content:center;gap:6px}
+.b svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.b.red{background:#ff2d2d}
+.b:active{transform:scale(.95)}
+#start{position:fixed;inset:0;display:grid;place-items:center;padding:24px;background:radial-gradient(120% 80% at 30% 10%,#3a3b37,#121311)}
+#start .box{max-width:420px;text-align:left}
+#start h1{font-size:40px;line-height:1.05;margin:0 0 12px;font-weight:800;letter-spacing:-.02em}
+#start p{color:#c9c7bf;margin:0 0 10px}
+#start ul{padding-left:18px;color:#c9c7bf;margin:0 0 22px}
+#start li{margin:4px 0}
+#go{width:100%;height:56px;border:0;border-radius:16px;background:var(--acc);color:#1a0a02;font:700 18px -apple-system,system-ui,sans-serif}
+#go:disabled{opacity:.6}
+#err{color:#ffb38f;margin-top:12px;min-height:1.4em}
+#toast{position:fixed;left:50%;top:40%;transform:translate(-50%,-50%);background:var(--glass);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);padding:10px 16px;border-radius:12px;font-weight:600;opacity:0;transition:opacity .25s;pointer-events:none;text-align:center}
+#toast.show{opacity:1}
+.hide{display:none!important}
+</style>
+</head>
+<body>
+<video id="vid" playsinline muted autoplay></video>
+<canvas id="cv"></canvas>
+
+<div id="top" class="hide">
+  <div class="chip" id="pen"><i></i><span>Alza l'indice per scrivere</span></div>
+  <div style="display:flex;gap:8px;align-items:center"><div class="chip" id="rec"><i></i><span>REC</span></div><button class="b" id="mode">Pizzico</button>
+<button class="b" id="flip" aria-label="Cambia fotocamera"><svg viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><path d="M9 13a3 3 0 0 1 5-2l1 1M15 14a3 3 0 0 1-5 2l-1-1"/></svg></button></div>
+</div>
+
+<div id="bar" class="hide">
+  <div class="row" id="colors"></div>
+  <div class="row">
+    <button class="b" id="fx">Gesso</button>
+    <button class="b" id="thin" aria-label="Più sottile"><svg viewBox="0 0 24 24"><path d="M5 12h14"/></svg></button>
+    <button class="b" id="thick" aria-label="Più spesso"><svg viewBox="0 0 24 24"><path d="M5 12h14M12 5v14"/></svg></button>
+    <button class="b" id="undo" aria-label="Annulla"><svg viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></svg></button>
+    <button class="b" id="clear" aria-label="Cancella tutto"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button>
+    <button class="b" id="photo" aria-label="Foto"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="14" rx="3"/><circle cx="12" cy="13" r="3.5"/></svg></button>
+    <button class="b" id="recBtn" aria-label="Registra"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="6" fill="#ff2d2d" stroke="none"/></svg></button>
+  </div>
+</div>
+
+<div id="start">
+  <div class="box">
+    <h1>Scrivi nell'aria</h1>
+    <p>Inquadrati con la fotocamera e scrivi col dito: la scritta compare dal vivo.</p>
+    <ul>
+      <li><b>Pollice e indice uniti</b> (come se tenessi una penna): scrive</li>
+      <li><b>Dita separate</b>: stacchi la penna</li>
+      <li><b>Mano aperta per 1 secondo</b>: cancella tutto</li>
+    </ul>
+    <p style="font-size:14px">Col pulsante in alto puoi cambiare gesto: Pizzico, Indice alzato o Sempre.</p>
+    <button id="go">Avvia fotocamera</button>
+    <div id="err"></div>
+  </div>
+</div>
+<div id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/hands.js" crossorigin="anonymous"></script>
+<script>
+{
+const MP='https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/';
+const $=s=>document.querySelector(s);
+const cv=$('#cv'),ctx=cv.getContext('2d'),vid=$('#vid');
+const ink=document.createElement('canvas'),ictx=ink.getContext('2d');
+const COLORS=['#f7f4ec','#ffd23f','#ff5b14','#3fd0ff','#7dff6b','#ff4fb8'];
+const FX=['Gesso','Luce','Pennarello'];
+const MODES=['Pizzico','Indice','Sempre'];
+const HINT=['Unisci pollice e indice per scrivere',"Alza solo l'indice per scrivere",'Il dito scrive sempre: togli la mano per staccare'];
+const st={mode:0,pinch:false,color:COLORS[0],size:8,fx:0,facing:'user',strokes:[],cur:null,hist:[],sx:null,sy:null,palmFrom:null,lm:null,pen:false,running:false,stream:null};
+let hands=null,busy=false,rec=null,chunks=[],recMime='';
+
+$('#colors').innerHTML=COLORS.map((c,i)=>`<button class="dot${i?'':' sel'}" style="background:${c}" data-c="${c}" aria-label="Colore ${i+1}"></button>`).join('');
+
+function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(()=>t.classList.remove('show'),1600)}
+
+// --- disegno ---
+function rnd(seed){let s=seed|0;return()=>{s=(s*1664525+1013904223)|0;return((s>>>0)%10000)/10000}}
+function lw(size){return size*cv.width/420}
+function segment(c,s,a,b,seed){
+  const w=lw(s.size);
+  c.save();c.lineCap='round';c.lineJoin='round';c.strokeStyle=s.color;c.fillStyle=s.color;c.lineWidth=w;
+  c.beginPath();c.moveTo(a.x,a.y);c.lineTo(b.x+.01,b.y);c.stroke();
+  if(s.fx==0){ // gesso: tolgo granelli
+    const r=rnd(seed),n=6+Math.hypot(b.x-a.x,b.y-a.y)/w*6;
+    c.globalCompositeOperation='destination-out';c.globalAlpha=.55;
+    for(let i=0;i<n;i++){const t=r(),x=a.x+(b.x-a.x)*t+(r()-.5)*w,y=a.y+(b.y-a.y)*t+(r()-.5)*w,z=.8+r()*w*.11;c.fillRect(x,y,z,z)}
+  }
+  c.restore();
+}
+function redraw(){
+  ictx.clearRect(0,0,ink.width,ink.height);
+  for(const s of st.strokes){const p=s.pts;for(let i=0;i<p.length;i++)segment(ictx,s,p[Math.max(0,i-1)],p[i],i*7919+s.seed)}
+}
+function compose(){
+  const W=cv.width,H=cv.height;
+  ctx.save();
+  if(st.facing=='user'){ctx.translate(W,0);ctx.scale(-1,1)}
+  ctx.drawImage(vid,0,0,W,H);
+  ctx.restore();
+  const glow=st.strokes.some(s=>s.fx==1);
+  if(glow){ctx.save();ctx.shadowColor=st.color;ctx.shadowBlur=lw(st.size)*2.5;ctx.drawImage(ink,0,0);ctx.drawImage(ink,0,0);ctx.restore()}
+  ctx.drawImage(ink,0,0);
+  if(st.tip){
+    const r=lw(st.size)+10;
+    ctx.beginPath();ctx.arc(st.tip.x,st.tip.y,r,0,7);ctx.lineWidth=Math.max(3,W/300);ctx.strokeStyle=st.pen?'#ff5b14':'rgba(255,255,255,.85)';ctx.stroke();
+    if(st.palmFrom){const f=Math.min(1,(performance.now()-st.palmFrom)/1000);ctx.beginPath();ctx.arc(st.tip.x,st.tip.y,r+14,-Math.PI/2,-Math.PI/2+f*Math.PI*2);ctx.strokeStyle='#ff3b3b';ctx.lineWidth=Math.max(4,W/200);ctx.stroke()}
+  }
+}
+
+// --- mano ---
+const d2=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
+const up=(l,t,p)=>d2(l[0],l[t])>d2(l[0],l[p])*1.12;
+function onResults(r){
+  const W=cv.width,H=cv.height,l=r.multiHandLandmarks&&r.multiHandLandmarks[0];
+  let tip=null,write=false,palm=false;
+  if(l){
+    const fx=v=>st.facing=='user'?1-v:v;
+    const i=up(l,8,6),m=up(l,12,10),a=up(l,16,14),p=up(l,20,18);
+    const pd=d2(l[4],l[8])/(d2(l[0],l[9])||1e-3);
+    st.pinch=st.pinch?pd<.5:pd<.32;
+    if(st.mode==0){tip={x:fx((l[4].x+l[8].x)/2)*W,y:(l[4].y+l[8].y)/2*H};write=st.pinch}
+    else{tip={x:fx(l[8].x)*W,y:l[8].y*H};write=st.mode==2?true:i&&!m}
+    palm=i&&m&&a&&p&&!st.pinch;
+    if(palm)write=false;
+  }
+  const now=performance.now();
+  if(palm){st.palmFrom=st.palmFrom||now;if(now-st.palmFrom>1000){if(st.strokes.length){st.strokes=[];st.cur=null;redraw();toast('Cancellato')}st.palmFrom=null;st.palmLock=now+1500}}
+  else st.palmFrom=null;
+  if(st.palmLock&&now<st.palmLock)st.palmFrom=null;
+  st.hist=[...st.hist,write].slice(-3);
+  st.pen=!!tip&&st.hist.filter(Boolean).length>=2;
+  if(st.pen){
+    if(st.sx==null){st.sx=tip.x;st.sy=tip.y;st.cur={color:st.color,size:st.size,fx:st.fx,seed:(Math.random()*1e6)|0,pts:[]};st.strokes.push(st.cur)}
+    else{st.sx+=(tip.x-st.sx)*.5;st.sy+=(tip.y-st.sy)*.5}
+    const p={x:st.sx,y:st.sy},pts=st.cur.pts,prev=pts[pts.length-1];
+    if(prev&&Math.hypot(p.x-prev.x,p.y-prev.y)>W*.15){st.cur={...st.cur,seed:st.cur.seed+1,pts:[]};st.strokes.push(st.cur)}
+    const q=st.cur.pts[st.cur.pts.length-1]||p;st.cur.pts.push(p);segment(ictx,st.cur,q,p,(st.cur.pts.length-1)*7919+st.cur.seed);
+  }else{st.sx=st.sy=null;st.cur=null}
+  st.tip=tip;
+  const pen=$('#pen');pen.classList.toggle('on',st.pen);
+  pen.querySelector('span').textContent=!tip?'Non vedo la mano':st.pen?'Sto scrivendo':palm?'Tieni aperta per cancellare':HINT[st.mode];
+}
+
+async function loop(){
+  if(!st.running)return;
+  if(vid.readyState>=2){
+    if(cv.width!==vid.videoWidth&&vid.videoWidth)resize();
+    if(!busy&&hands){busy=true;try{await hands.send({image:vid})}catch(e){}busy=false}
+    compose();
+  }
+  requestAnimationFrame(loop);
+}
+function resize(){
+  const k=Math.min(1,1280/Math.max(vid.videoWidth,vid.videoHeight));
+  const W=Math.round(vid.videoWidth*k),H=Math.round(vid.videoHeight*k);
+  const sx=cv.width?W/cv.width:1,sy=cv.height?H/cv.height:1;
+  cv.width=ink.width=W;cv.height=ink.height=H;
+  for(const s of st.strokes)for(const p of s.pts){p.x*=sx;p.y*=sy}
+  redraw();
+}
+
+async function startCam(){
+  if(st.stream)st.stream.getTracks().forEach(t=>t.stop());
+  st.stream=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:st.facing,width:{ideal:1280},height:{ideal:720}}});
+  vid.srcObject=st.stream;await vid.play();
+}
+
+$('#go').addEventListener('click',async()=>{
+  const b=$('#go');b.disabled=true;b.textContent='Avvio…';$('#err').textContent='';
+  try{
+    if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia)throw new Error('nocam');
+    await startCam();
+    if(!window.Hands)throw new Error('nomp');
+    b.textContent='Carico il riconoscimento della mano…';
+    hands=new Hands({locateFile:f=>MP+f});
+    hands.setOptions({maxNumHands:1,modelComplexity:0,minDetectionConfidence:.6,minTrackingConfidence:.5});
+    hands.onResults(onResults);
+    await hands.initialize();
+    $('#start').classList.add('hide');$('#top').classList.remove('hide');$('#bar').classList.remove('hide');
+    st.running=true;resize();loop();
+  }catch(e){
+    b.disabled=false;b.textContent='Riprova';
+    const m=String(e&&(e.name||e.message));
+    $('#err').textContent=m.includes('NotAllowed')?'Hai negato la fotocamera. Su iPhone: Impostazioni › Safari › Fotocamera › Consenti, poi ricarica.':m.includes('nocam')?'Questo browser non dà accesso alla fotocamera. Apri la pagina in Safari, da un indirizzo https.':m.includes('nomp')?'Non riesco a scaricare il riconoscimento della mano: controlla la connessione.':'Qualcosa non va: '+m;
+  }
+});
+
+// --- comandi ---
+$('#colors').addEventListener('click',e=>{const b=e.target.closest('.dot');if(!b)return;st.color=b.dataset.c;document.querySelectorAll('.dot').forEach(d=>d.classList.toggle('sel',d==b))});
+try{const m=+localStorage.getItem('scriviMode');if(m>=0&&m<3){st.mode=m;$('#mode').textContent=MODES[m]}}catch(e){}
+$('#mode').addEventListener('click',()=>{st.mode=(st.mode+1)%MODES.length;$('#mode').textContent=MODES[st.mode];st.pinch=false;st.hist=[];toast(HINT[st.mode]);try{localStorage.setItem('scriviMode',st.mode)}catch(e){}});
+$('#fx').addEventListener('click',()=>{st.fx=(st.fx+1)%FX.length;$('#fx').textContent=FX[st.fx]});
+$('#thin').addEventListener('click',()=>{st.size=Math.max(2,st.size-2);toast('Spessore '+st.size)});
+$('#thick').addEventListener('click',()=>{st.size=Math.min(30,st.size+2);toast('Spessore '+st.size)});
+$('#undo').addEventListener('click',()=>{st.strokes.pop();st.cur=null;redraw()});
+$('#clear').addEventListener('click',()=>{st.strokes=[];st.cur=null;redraw();toast('Cancellato')});
+$('#flip').addEventListener('click',async()=>{st.facing=st.facing=='user'?'environment':'user';st.strokes=[];st.cur=null;redraw();try{await startCam()}catch(e){toast('Non riesco a cambiare fotocamera')}});
+
+async function share(blob,name){
+  const file=new File([blob],name,{type:blob.type});
+  if(navigator.canShare&&navigator.canShare({files:[file]})){try{await navigator.share({files:[file]});return}catch(e){if(e.name=='AbortError')return}}
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();a.remove();
+}
+$('#photo').addEventListener('click',()=>{cv.toBlob(b=>b&&share(b,'scritta.png'),'image/png');toast('Foto!')});
+function pickMime(){for(const m of['video/mp4;codecs=avc1','video/mp4','video/webm;codecs=vp9','video/webm'])if(MediaRecorder.isTypeSupported&&MediaRecorder.isTypeSupported(m))return m;return''}
+$('#recBtn').addEventListener('click',()=>{
+  if(rec){rec.stop();return}
+  if(!window.MediaRecorder||!cv.captureStream){toast('Registrazione non supportata qui');return}
+  recMime=pickMime();chunks=[];
+  rec=new MediaRecorder(cv.captureStream(30),recMime?{mimeType:recMime,videoBitsPerSecond:6e6}:undefined);
+  rec.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data)};
+  rec.onstop=()=>{const type=(recMime||rec.mimeType||'video/mp4').split(';')[0];const blob=new Blob(chunks,{type});rec=null;$('#rec').classList.remove('show');$('#recBtn').classList.remove('red');share(blob,'scritta.'+(type.includes('mp4')?'mp4':'webm'))};
+  rec.start(500);$('#rec').classList.add('show');$('#recBtn').classList.add('red');toast('Registrazione avviata');
+});
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&st.running&&vid.paused)vid.play().catch(()=>{})});
+}
+</script>
+</body>
+</html>
